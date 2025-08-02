@@ -127,6 +127,40 @@ const validateProfileUpdate = (req, res, next) => {
   next();
 };
 
+// Validation middleware for starting an interview
+const validateStartInterview = (req, res, next) => {
+  const { jobRole, interviewType } = req.body;
+  
+  // Validate job role
+  if (!jobRole || jobRole.trim() === '') {
+    return res.status(400).json({ message: 'Job role is required' });
+  }
+  
+  // Validate interview type
+  if (!interviewType || interviewType.trim() === '') {
+    return res.status(400).json({ message: 'Interview type is required' });
+  }
+  
+  next();
+};
+
+// Validation middleware for question and answer
+const validateQuestionAnswer = (req, res, next) => {
+  const { question, answer } = req.body;
+  
+  // Validate question
+  if (!question || question.trim() === '') {
+    return res.status(400).json({ message: 'Question is required' });
+  }
+  
+  // Validate answer
+  if (!answer || answer.trim() === '') {
+    return res.status(400).json({ message: 'Answer is required' });
+  }
+  
+  next();
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -134,5 +168,7 @@ module.exports = {
   validateForgotPassword,
   validateResetPassword,
   validateChangePassword,
-  validateProfileUpdate
+  validateProfileUpdate,
+  validateStartInterview,
+  validateQuestionAnswer
 };

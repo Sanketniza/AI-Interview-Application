@@ -5,16 +5,24 @@ exports.generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
+// Create email transport configuration
+const createTransporter = () => {
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    service: process.env.SMTP_SERVICE,
+    port: process.env.SMTP_PORT,
+    secure: process.env.SMTP_PORT === '465',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS
+    }
+  });
+};
+
 // Send email using nodemailer
 exports.sendEmail = async (to, subject, text, html = null) => {
   try {
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      }
-    });
+    const transporter = createTransporter();
     
     const mailOptions = {
       from: `AI Interview App <${process.env.EMAIL_USER}>`,
