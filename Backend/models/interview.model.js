@@ -52,6 +52,12 @@ const interviewSchema = new mongoose.Schema({
   completedAt: Date
 }, { timestamps: true });
 
+// Create indexes for better performance
+interviewSchema.index({ user: 1 });
+interviewSchema.index({ status: 1 });
+interviewSchema.index({ company: 1, role: 1 });
+interviewSchema.index({ createdAt: -1 });
+
 const Interview = mongoose.model('Interview', interviewSchema);
 
 module.exports = Interview;

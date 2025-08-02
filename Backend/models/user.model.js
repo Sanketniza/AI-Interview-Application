@@ -37,6 +37,12 @@ const userSchema = new mongoose.Schema({
   passwordResetExpires: Date
 }, { timestamps: true });
 
+// Create indexes for better performance
+userSchema.index({ email: 1 }, { unique: true });
+userSchema.index({ role: 1 });
+userSchema.index({ emailVerificationCode: 1, emailVerificationExpires: 1 });
+userSchema.index({ passwordResetCode: 1, passwordResetExpires: 1 });
+
 // Hash password before saving
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();

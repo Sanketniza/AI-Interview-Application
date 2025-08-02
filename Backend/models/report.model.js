@@ -47,6 +47,11 @@ const reportSchema = new mongoose.Schema({
   transcript: String
 }, { timestamps: true });
 
+// Create indexes for better performance
+reportSchema.index({ user: 1 });
+reportSchema.index({ interview: 1 }, { unique: true });
+reportSchema.index({ createdAt: -1 });
+
 const Report = mongoose.model('Report', reportSchema);
 
 module.exports = Report;

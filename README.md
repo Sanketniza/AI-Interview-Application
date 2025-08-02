@@ -75,12 +75,51 @@ npm run dev
         └── services/
 ```
 
+## Database Setup
+
+### Local MongoDB
+
+For development, you can use a local MongoDB instance. Make sure to update your `.env` file with the appropriate connection string:
+
+```env
+```env
+MONGO_URI=mongodb://localhost:27017/aiinterviewapp
+```
+```
+
+### MongoDB Atlas (Recommended for Production)
+
+We recommend using MongoDB Atlas for production environments.
+
+1. Follow the setup guide in `Backend/docs/mongodb-atlas-setup.md` to create your Atlas cluster
+2. Update your `.env` file with the Atlas connection string
+3. Configure appropriate network access and security settings
+
+## Database Maintenance
+
+The application includes utilities for database maintenance:
+
+
+```bash
+# Create a database backup
+node Backend/utils/db-utils.js backup
+
+# List available backups
+node Backend/utils/db-utils.js list
+
+# Restore from a backup
+node Backend/utils/db-utils.js restore <backup-path>
+```
+
+
+For more information on database maintenance and optimization, refer to `Backend/docs/database-maintenance.md`.
+
 ## Next Steps
 
-1. Implement user authentication routes and components
-2. Design interview flow and AI interaction
-3. Create interview components with voice capability
-4. Develop feedback report generation system
+1. Complete interview flow and AI interaction
+2. Create interview components with voice capability
+3. Develop feedback report generation system
+4. Add monitoring and analytics dashboard
 
 ## License
 
