@@ -26,14 +26,25 @@ exports.register = async (req, res) => {
       emailVerificationExpires: verificationExpires
     });
     
-    // Save user
+    // Save user first
     await user.save();
     
-    // Send verification email
-    await sendEmail(email, 'Email Verification', `Your verification code is: ${verificationCode}`);
+    // Try to send verification email, but don't fail registration if it doesn't work
+    try {
+      const emailSent = await sendEmail(email, 'Email Verification', `Your verification code is: ${verificationCode}`);
+      console.log(`Email sending status: ${emailSent ? 'Success' : 'Failed'}`);
+      
+      if (!emailSent) {
+        console.warn(`Failed to send verification email to ${email}, but user was still registered`);
+      }
+    } catch (emailError) {
+      console.error('Email sending error:', emailError);
+      // Continue with registration even if email sending fails
+    }
     
     res.status(201).json({ message: 'User registered successfully. Please verify your email.' });
   } catch (error) {
+    console.error('Registration error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -57,7 +68,26 @@ exports.login = async (req, res) => {
     
     // Check if user is verified
     if (!user.isVerified) {
-      return res.status(400).json({ message: 'Please verify your email before logging in' });
+      // Regenerate verification code if needed
+      if (!user.emailVerificationCode || !user.emailVerificationExpires || user.emailVerificationExpires < Date.now()) {
+        const verificationCode = generateOTP();
+        const verificationExpires = Date.now() + 3600000; // 1 hour
+        
+        user.emailVerificationCode = verificationCode;
+        user.emailVerificationExpires = verificationExpires;
+        await user.save();
+        
+        // Try to send the new verification code
+        try {
+          await sendEmail(email, 'Email Verification', `Your new verification code is: ${verificationCode}`);
+        } catch (error) {
+          console.error('Failed to send new verification code:', error);
+        }
+      }
+      
+      return res.status(400).json({ 
+        message: 'Please verify your email before logging in. A verification code has been sent to your email address.' 
+      });
     }
     
     // Generate token

@@ -33,9 +33,12 @@ exports.sendEmail = async (to, subject, text, html = null) => {
     };
     
     await transporter.sendMail(mailOptions);
+    console.log(`Email sent successfully to ${to}`);
     return true;
   } catch (error) {
     console.error('Error sending email:', error);
+    // Don't fail silently - we want to know what's happening
+    console.error('Email error details:', JSON.stringify(error));
     return false;
   }
 };

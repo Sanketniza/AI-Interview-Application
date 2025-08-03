@@ -1,30 +1,40 @@
 import { Routes, Route } from 'react-router-dom'
 import './App.css'
 
-// Import pages (we'll create these later)
-// import Home from './pages/Home'
-// import Login from './pages/Login'
-// import Register from './pages/Register'
-// import Dashboard from './pages/Dashboard'
-// import Interview from './pages/Interview'
-// import History from './pages/History'
-// import NotFound from './pages/NotFound'
+// Import pages and components
+import Home from './pages/Home'
+import Dashboard from './pages/Dashboard'
+import InterviewSelection from './pages/InterviewSelection'
+import InterviewSession from './pages/InterviewSession'
+import InterviewReport from './pages/InterviewReport'
+import InterviewHistory from './pages/InterviewHistory'
+import Login from './components/auth/Login'
+import Register from './components/auth/Register'
+import ForgotPassword from './components/auth/ForgotPassword'
+import ResetPassword from './components/auth/ResetPassword'
+import VerifyEmail from './components/auth/VerifyEmail'
 
 function App() {
   return (
     <div className="min-h-screen bg-gray-100">
       <Routes>
-        <Route path="/" element={<div className="p-4 text-center">
-          <h1 className="text-4xl font-bold text-blue-600 mb-4">AI Interview</h1>
-          <p className="text-lg">Welcome to AI Interview Application</p>
-        </div>} />
-        {/* Add these routes when components are created */}
-        {/* <Route path="/login" element={<Login />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/interview" element={<Interview />} />
-        <Route path="/history" element={<History />} />
-        <Route path="*" element={<NotFound />} /> */}
+        <Route path="/history" element={<InterviewHistory />} />
+        <Route path="/interview/new" element={<InterviewSelection />} />
+        <Route path="/interview/session" element={<InterviewSession />} />
+        <Route path="/interview/report/:reportId" element={<InterviewReport />} />
+        <Route path="*" element={
+          <div className="p-4 text-center">
+            <h1 className="text-4xl font-bold text-blue-600 mb-4">Page Not Found</h1>
+            <p className="text-lg">The page you're looking for doesn't exist.</p>
+          </div>
+        } />
       </Routes>
     </div>
   )

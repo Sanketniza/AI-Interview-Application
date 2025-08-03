@@ -28,14 +28,24 @@ api.interceptors.request.use(
 export const authService = {
   // Register a new user
   register: async (userData) => {
-    const response = await api.post('/auth/register', userData);
-    return response.data;
+    try {
+      const response = await api.post('/auth/register', userData);
+      return response.data;
+    } catch (error) {
+      console.error('API register error:', error);
+      throw error; // Re-throw to be caught by the component
+    }
   },
   
   // Login user
   login: async (credentials) => {
-    const response = await api.post('/auth/login', credentials);
-    return response.data;
+    try {
+      const response = await api.post('/auth/login', credentials);
+      return response.data;
+    } catch (error) {
+      console.error('API login error:', error);
+      throw error; // Re-throw to be caught by the component
+    }
   },
   
   // Verify email with OTP
