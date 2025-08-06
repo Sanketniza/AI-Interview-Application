@@ -68,10 +68,11 @@ exports.generateReport = async (req, res) => {
     const existingReport = await Report.findOne({ interview: interviewId });
     
     if (existingReport) {
-      return res.status(400).json({
-        success: false,
-        message: 'Report already exists for this interview',
-        reportId: existingReport._id,
+      // If report exists, return it instead of an error
+      return res.status(200).json({
+        success: true,
+        message: 'Report found',
+        data: existingReport,
       });
     }
 
@@ -100,10 +101,11 @@ exports.generateReport = async (req, res) => {
       };
     });
 
-    const newReport = new Report({
+    const reportData = {
       user: req.user.id,
       interview: interviewId,
       overallScore,
+      status: 'completed',
       technicalSkills: {
         score: technicalScore,
         feedback: `Your technical knowledge was ${technicalScore >= 80 ? 'strong' : technicalScore >= 70 ? 'adequate' : 'needs improvement'}.`
@@ -127,13 +129,20 @@ exports.generateReport = async (req, res) => {
         'Work on structuring answers using the STAR method',
       ],
       questionFeedback: questionFeedback,
+    };
+
+    // Create or update the report
+    const newReport = await Report.findOneAndUpdate(
+      { interview: interviewId },
+      reportData,
+      { new: true, upsert: true }
+    );
+
+    // Update the interview with report status and reference
+    await Interview.findByIdAndUpdate(interviewId, {
+      reportStatus: 'generated',
+      report: newReport._id
     });
-
-    await newReport.save();
-
-    // Update the interview with the report reference
-    interview.report = newReport._id;
-    await interview.save();
 
     // Get user email and send report email
     const user = await User.findById(req.user.id);
