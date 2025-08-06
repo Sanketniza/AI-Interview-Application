@@ -6,17 +6,25 @@ const interviewSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
-  company: {
+  jobRole: {
     type: String,
     required: true,
     trim: true
   },
-  role: {
+  companyName: {
+    type: String,
+    default: 'Practice Interview',
+    trim: true
+  },
+  interviewType: {
     type: String,
     required: true,
     trim: true
   },
-  questions: [
+  // Array of questions generated for this interview
+  questions: [String],
+  // Detailed questions and answers during the interview
+  questionsAndAnswers: [
     {
       question: {
         type: String,
@@ -29,27 +37,20 @@ const interviewSchema = new mongoose.Schema({
       }
     }
   ],
-  feedback: {
-    strengths: [String],
-    weaknesses: [String],
-    overallScore: {
-      type: Number,
-      min: 0,
-      max: 10
-    },
-    recommendation: String,
-    summary: String
-  },
   duration: {
-    type: Number,  // in minutes
+    type: Number, // in milliseconds
     default: 0
   },
   status: {
     type: String,
-    enum: ['ongoing', 'completed', 'cancelled'],
-    default: 'ongoing'
+    enum: ['in-progress', 'completed', 'cancelled'],
+    default: 'in-progress'
   },
-  completedAt: Date
+  startTime: {
+    type: Date,
+    default: Date.now
+  },
+  endTime: Date
 }, { timestamps: true });
 
 // Create indexes for better performance

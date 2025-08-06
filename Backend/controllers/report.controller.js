@@ -5,6 +5,25 @@ const mongoose = require('mongoose');
 const emailUtil = require('../utils/email.util');
 
 /**
+ * Helper function to generate feedback based on score
+ * @param {number} score - Score between 0-100
+ * @returns {string} Feedback text
+ */
+const generateFeedback = (score) => {
+  if (score >= 90) {
+    return 'Excellent response! You demonstrated comprehensive knowledge and provided detailed examples.';
+  } else if (score >= 80) {
+    return 'Strong answer that covered the key points well. Consider adding more specific examples next time.';
+  } else if (score >= 70) {
+    return 'Good response that addressed the question. Could benefit from more structure and detail.';
+  } else if (score >= 60) {
+    return 'Satisfactory answer, but lacks depth. Try using the STAR method to structure your responses better.';
+  } else {
+    return 'This answer needs improvement. Focus on providing concrete examples and better articulating your experience.';
+  }
+};
+
+/**
  * Generate a report for an interview
  * @route POST /api/report/:interviewId
  * @access Private
@@ -62,42 +81,52 @@ exports.generateReport = async (req, res) => {
     // For now, we'll create a simplified report structure
 
     // Generate mock scores and feedback
-    const technicalScore = Math.floor(Math.random() * 41) + 60; // 60-100
-    const communicationScore = Math.floor(Math.random() * 41) + 60;
-    const problemSolvingScore = Math.floor(Math.random() * 41) + 60;
+    const technicalScore = Math.floor(Math.random() * 31) + 70; // 70-100
+    const communicationScore = Math.floor(Math.random() * 31) + 70;
+    const problemSolvingScore = Math.floor(Math.random() * 31) + 70;
     const overallScore = Math.floor((technicalScore + communicationScore + problemSolvingScore) / 3);
+
+    // Extract questions and answers from the interview
+    const questionsAndAnswers = interview.questionsAndAnswers || [];
+    
+    // Generate feedback for each question
+    const questionFeedback = questionsAndAnswers.map(qa => {
+      const score = Math.floor(Math.random() * 31) + 70; // 70-100
+      return {
+        question: qa.question,
+        answer: qa.answer,
+        feedback: generateFeedback(score),
+        score: score
+      };
+    });
 
     const newReport = new Report({
       user: req.user.id,
       interview: interviewId,
-      jobRole: interview.jobRole,
-      companyName: interview.companyName,
       overallScore,
-      feedbackSummary: `Your overall performance was ${overallScore >= 80 ? 'excellent' : overallScore >= 70 ? 'good' : 'satisfactory'}.`,
-      categoryScores: {
-        technical: {
-          score: technicalScore,
-          feedback: `Your technical knowledge was ${technicalScore >= 80 ? 'strong' : technicalScore >= 70 ? 'adequate' : 'needs improvement'}.`,
-        },
-        communication: {
-          score: communicationScore,
-          feedback: `Your communication skills were ${communicationScore >= 80 ? 'excellent' : communicationScore >= 70 ? 'good' : 'need refinement'}.`,
-        },
-        problemSolving: {
-          score: problemSolvingScore,
-          feedback: `Your problem solving approach was ${problemSolvingScore >= 80 ? 'highly effective' : problemSolvingScore >= 70 ? 'adequate' : 'needs more structure'}.`,
-        },
+      technicalSkills: {
+        score: technicalScore,
+        feedback: `Your technical knowledge was ${technicalScore >= 80 ? 'strong' : technicalScore >= 70 ? 'adequate' : 'needs improvement'}.`
       },
-      improvementAreas: [
-        'Consider providing more specific examples',
-        'Practice explaining complex concepts simply',
-        'Work on structuring answers using the STAR method',
-      ],
+      communicationSkills: {
+        score: communicationScore,
+        feedback: `Your communication skills were ${communicationScore >= 80 ? 'excellent' : communicationScore >= 70 ? 'good' : 'need refinement'}.`
+      },
+      problemSolvingSkills: {
+        score: problemSolvingScore,
+        feedback: `Your problem solving approach was ${problemSolvingScore >= 80 ? 'highly effective' : problemSolvingScore >= 70 ? 'adequate' : 'needs more structure'}.`
+      },
       strengths: [
         'Good technical foundation',
         'Ability to remain composed under pressure',
         'Clear communication style',
       ],
+      areasForImprovement: [
+        'Consider providing more specific examples',
+        'Practice explaining complex concepts simply',
+        'Work on structuring answers using the STAR method',
+      ],
+      questionFeedback: questionFeedback,
     });
 
     await newReport.save();
@@ -126,9 +155,30 @@ exports.generateReport = async (req, res) => {
     });
   } catch (error) {
     console.error('Error generating report:', error);
+    console.error('Error details:', JSON.stringify(error, null, 2));
+    console.error('Interview ID:', interviewId);
+    
+    // Check if interview exists to provide more specific error messages
+    try {
+      const interviewCheck = await Interview.findById(interviewId);
+      if (!interviewCheck) {
+        return res.status(404).json({
+          success: false,
+          message: 'Interview no longer exists',
+          error: 'The interview may have been deleted',
+        });
+      }
+      
+      // Additional error information
+      console.error('Interview status:', interviewCheck.status);
+      console.error('Questions and answers count:', interviewCheck.questionsAndAnswers?.length || 0);
+    } catch (checkError) {
+      console.error('Error checking interview status:', checkError);
+    }
+    
     res.status(500).json({
       success: false,
-      message: 'Error generating report',
+      message: 'Error generating report: ' + (error.message || 'Unknown error'),
       error: error.message,
     });
   }
