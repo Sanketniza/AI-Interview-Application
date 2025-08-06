@@ -1,7 +1,91 @@
+// Helper to always generate or update a report for an interview
+async function generateOrUpdateReport(interview, userId) {
+  const Report = require('../models/report.model');
+  const interviewId = interview._id;
+  const questionsAndAnswers = interview.questionsAndAnswers || [];
+
+
+  // --- Enhanced feedback logic ---
+  // Helper to analyze answer quality
+  function analyzeAnswer(answer) {
+    if (!answer || answer.trim().length < 10) return 'Needs Improvement';
+    if (answer.length > 100 && /\b(result|impact|achieve|deliver|success|metric|quantify)\b/i.test(answer)) return 'Excellent';
+    if (answer.length > 50) return 'Good';
+    return 'Needs Improvement';
+  }
+
+  // Per-question feedback
+  let improvementCount = 0, goodCount = 0, excellentCount = 0;
+  const questionFeedback = questionsAndAnswers.map(qa => {
+    const label = analyzeAnswer(qa.answer);
+    if (label === 'Needs Improvement') improvementCount++;
+    if (label === 'Good') goodCount++;
+    if (label === 'Excellent') excellentCount++;
+    return {
+      question: qa.question,
+      answer: qa.answer,
+      feedback: label,
+    };
+  });
+
+  // Dynamic strengths/areas for improvement
+  let strengths = [], areasForImprovement = [];
+  if (excellentCount > 0) strengths.push('Provided detailed and impactful answers.');
+  if (goodCount > 0) strengths.push('Willingness to answer questions.');
+  if (questionsAndAnswers.length > 0) strengths.push('Open to feedback.');
+
+  if (improvementCount > 0) {
+    areasForImprovement.push('Provide more detailed and specific answers to demonstrate your understanding and experience.');
+    areasForImprovement.push('Use the STAR method (Situation, Task, Action, Result) to structure your responses for clarity and impact.');
+    areasForImprovement.push('Quantify your achievements whenever possible to showcase the value you\'ve delivered in past projects.');
+    if (interview.companyName) {
+      areasForImprovement.push(`Research ${interview.companyName}\'s digital transformation initiatives to align your responses with their specific focus areas.`);
+    }
+  }
+
+  // Scores (still random for now)
+  const technicalScore = Math.floor(Math.random() * 31) + 70;
+  const communicationScore = Math.floor(Math.random() * 31) + 70;
+  const problemSolvingScore = Math.floor(Math.random() * 31) + 70;
+  const overallScore = Math.floor((technicalScore + communicationScore + problemSolvingScore) / 3);
+
+  const reportData = {
+    user: userId,
+    interview: interviewId,
+    status: 'completed',
+    overallScore,
+    technicalSkills: {
+      score: technicalScore,
+      feedback: technicalScore >= 80 ? 'Strong technical foundation.' : 'Technical skills can be improved.'
+    },
+    communicationSkills: {
+      score: communicationScore,
+      feedback: communicationScore >= 80 ? 'Clear and effective communication.' : 'Work on structuring and clarifying your responses.'
+    },
+    problemSolvingSkills: {
+      score: problemSolvingScore,
+      feedback: problemSolvingScore >= 80 ? 'Excellent problem-solving approach.' : 'Try to break down problems more methodically.'
+    },
+    strengths,
+    areasForImprovement,
+    questionFeedback
+  };
+
+  let report = await Report.findOne({ interview: interviewId });
+  if (!report) {
+    report = new Report(reportData);
+    await report.save();
+  } else {
+    report.set(reportData);
+    await report.save();
+  }
+  return report;
+}
 const Interview = require('../models/interview.model');
 const Report = require('../models/report.model');
 const User = require('../models/user.model');
 const mongoose = require('mongoose');
+const reportController = require('./report.controller');
 
 /**
  * Start a new interview session
@@ -148,11 +232,21 @@ exports.completeInterview = async (req, res) => {
     interview.endTime = Date.now();
     interview.duration = interview.endTime - interview.createdAt;
 
+    interview.reportStatus = 'pending';
     await interview.save();
     console.log(`Interview ${interviewId} successfully marked as completed`);
 
-    // Here you would typically trigger report generation
-    // This could be a background process in a production app
+    // Always generate or update the report with content
+    try {
+      await generateOrUpdateReport(interview, req.user.id);
+      interview.reportStatus = 'generated';
+      await interview.save();
+      console.log(`Report generated/updated successfully for interview ${interviewId}`);
+    } catch (reportError) {
+      console.error('Error generating report:', reportError);
+      interview.reportStatus = 'failed';
+      await interview.save();
+    }
 
     res.status(200).json({
       success: true,
@@ -188,7 +282,7 @@ exports.getInterviews = async (req, res) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .select('jobRole companyName interviewType status createdAt endTime duration');
+      .select('jobRole companyName interviewType status reportStatus createdAt endTime duration');
 
     const total = await Interview.countDocuments({ user: req.user.id });
 
@@ -275,92 +369,47 @@ exports.generateQuestions = async (req, res) => {
       });
     }
 
+    // Use findById to get interview and check permissions
     const interview = await Interview.findById(interviewId);
-
     if (!interview) {
       return res.status(404).json({
         success: false,
         message: 'Interview not found',
       });
     }
-
-    // Check if user owns this interview
     if (interview.user.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: 'Unauthorized to access this interview',
       });
     }
-
-    // Generate questions based on domain and role
     const domainType = interview.interviewType;
     const jobRole = interview.jobRole;
-    
     let questions = [];
-    
     try {
-      // Try to generate questions using Gemini API
       const axios = require('axios');
-      
-      // Use environment variable or fallback to hardcoded key (not recommended for production)
-      const API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyD16ZU7DPoL7tRDDeu-ZtIH0PqAnTunoc8';
-      
-      if (!API_KEY) {
-        throw new Error('Gemini API key is not configured');
-      }
-      
-      // Logging the job role and domain for debugging
+      const API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyBEfC_-ySH9Thvssmcstn5leMPkjLgv3XU';
+      if (!API_KEY) throw new Error('Gemini API key is not configured');
       console.log(`Generating questions for ${jobRole} position in ${domainType} field`);
-      
-      const prompt = `Generate 5 professional and diverse interview questions for a ${jobRole} position in the ${domainType} field. 
-      These should be challenging questions that test the candidate's knowledge, experience, and problem-solving abilities.
-      Ensure the questions are varied and not repetitive.
-      Return ONLY a JSON array of 5 strings containing questions, with no additional text, like this:
-      ["Question 1 text here?", "Question 2 text here?", "Question 3 text here?", "Question 4 text here?", "Question 5 text here?"]`;
-      
+      const prompt = `Generate 5 professional and diverse interview questions for a ${jobRole} position in the ${domainType} field.\nThese should be challenging questions that test the candidate's knowledge, experience, and problem-solving abilities.\nEnsure the questions are varied and not repetitive.\nReturn ONLY a JSON array of 5 strings containing questions, with no additional text, like this:\n[\"Question 1 text here?\", \"Question 2 text here?\", \"Question 3 text here?\", \"Question 4 text here?\", \"Question 5 text here?\"]`;
       console.log('Sending request to Gemini API...');
-      
       const response = await axios.post(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
         {
-          contents: [{
-            parts: [{
-              text: prompt
-            }]
-          }],
-          generationConfig: {
-            temperature: 0.9,
-            maxOutputTokens: 1024
-          }
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.9, maxOutputTokens: 1024 }
         },
         {
-          params: {
-            key: API_KEY
-          },
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-goog-api-key': API_KEY
           }
         }
       );
-      
-      // Parse the response
-      console.log('Received response from Gemini API');
-      
-      if (!response.data || !response.data.candidates || !response.data.candidates[0]) {
-        console.error('Invalid response structure from Gemini API:', JSON.stringify(response.data, null, 2));
-        throw new Error('Invalid response from Gemini API');
-      }
-      
-      if (!responseText) {
-        console.error('No response text received from Gemini API');
-        throw new Error('No content received from Gemini API');
-      }
-      
+      const responseText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!responseText) throw new Error('No content received from Gemini API');
       console.log('Raw response from Gemini:', responseText);
-      
-      // Try to extract JSON array from the text
       try {
-        // First, check if the response is already a valid JSON array
         if (responseText.trim().startsWith('[') && responseText.trim().endsWith(']')) {
           try {
             const parsedQuestions = JSON.parse(responseText.trim());
@@ -370,11 +419,8 @@ exports.generateQuestions = async (req, res) => {
             }
           } catch (jsonError) {
             console.error('Failed to parse direct JSON response:', jsonError);
-            // Continue to next approach
           }
         }
-        
-        // If not parsed as JSON array yet, try to find JSON array in the text
         if (questions.length === 0) {
           const jsonMatch = responseText.match(/\[([\s\S]*?)\]/);
           if (jsonMatch) {
@@ -387,30 +433,15 @@ exports.generateQuestions = async (req, res) => {
               }
             } catch (embeddedJsonError) {
               console.error('Failed to parse embedded JSON:', embeddedJsonError);
-              // Continue to next approach
             }
           }
         }
-        
-        // If still no questions, try line-by-line parsing
         if (questions.length === 0) {
           questions = responseText
             .split('\n')
             .map(line => line.trim())
-            .filter(line => {
-              // Filter out empty lines, code fence markers, and very short lines
-              return line && 
-                     line.length > 10 && 
-                     !line.startsWith('```') && 
-                     !line.startsWith('/*') && 
-                     !line.startsWith('*') && 
-                     !line.startsWith('//');
-            })
-            .map(line => {
-              // Remove numbers, quotes, and other formatting
-              return line.replace(/^\d+[\.\)]\s*|^[-*•]\s*|^"|"$|^'|'$/g, '').trim();
-            });
-          
+            .filter(line => line && line.length > 10 && !line.startsWith('```') && !line.startsWith('/*') && !line.startsWith('*') && !line.startsWith('//'))
+            .map(line => line.replace(/^\d+[\.\)]\s*|^[-*•]\s*|^"|"$|^'|'$/g, '').trim());
           console.log('Parsed questions line by line:', questions);
         }
       } catch (parseError) {
@@ -420,10 +451,7 @@ exports.generateQuestions = async (req, res) => {
     } catch (aiError) {
       console.error('Error generating questions with Gemini API:', aiError.message);
       console.error('Full error details:', JSON.stringify(aiError.response?.data || aiError, null, 2));
-      // Fallback to default questions will happen below
     }
-    
-    // Use fallback questions if API call failed or didn't return valid questions
     if (!questions || questions.length === 0) {
       console.log('Using complete set of fallback questions due to AI failure');
       questions = [
@@ -435,7 +463,6 @@ exports.generateQuestions = async (req, res) => {
       ];
     } else if (questions.length < 5) {
       console.log(`Only received ${questions.length} questions from AI, adding fallback questions`);
-      // Add fallback questions if we don't have enough
       const fallbackQuestions = [
         `Tell me about your experience with ${jobRole} roles.`,
         `What are the key skills needed for a successful ${jobRole}?`,
@@ -443,28 +470,25 @@ exports.generateQuestions = async (req, res) => {
         `How do you stay updated with the latest trends in ${domainType}?`,
         `Where do you see yourself in 5 years in the ${domainType} industry?`
       ];
-      
-      // Add missing questions
       for (let i = questions.length; i < 5; i++) {
         questions.push(fallbackQuestions[i - questions.length]);
       }
     } else if (questions.length > 5) {
       console.log(`Received ${questions.length} questions, limiting to 5`);
-      // Limit to 5 questions if we have more
       questions = questions.slice(0, 5);
     }
-    
-    // Update interview with generated questions
-    console.log('Saving final set of questions:', questions);
-    interview.questions = questions;
-    await interview.save();
-
+    // Use findByIdAndUpdate for atomic update to avoid VersionError
+    const updatedInterview = await Interview.findByIdAndUpdate(
+      interviewId,
+      { $set: { questions } },
+      { new: true }
+    );
     res.status(200).json({
       success: true,
       message: 'Questions generated successfully',
       data: {
-        interviewId: interview._id,
-        questions: interview.questions,
+        interviewId: updatedInterview._id,
+        questions: updatedInterview.questions,
       },
     });
   } catch (error) {

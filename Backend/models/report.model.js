@@ -12,17 +12,17 @@ const reportSchema = new mongoose.Schema({
     required: true
   },
   strengths: [String],
-  weaknesses: [String],
+  areasForImprovement: [String],  // Changed from weaknesses to match frontend
   overallScore: {
     type: Number,
     min: 0,
-    max: 10
+    max: 100
   },
   technicalSkills: {
     score: {
       type: Number,
       min: 0,
-      max: 10
+      max: 100
     },
     feedback: String
   },
@@ -30,7 +30,7 @@ const reportSchema = new mongoose.Schema({
     score: {
       type: Number,
       min: 0,
-      max: 10
+      max: 100
     },
     feedback: String
   },
@@ -38,10 +38,22 @@ const reportSchema = new mongoose.Schema({
     score: {
       type: Number,
       min: 0,
-      max: 10
+      max: 100
     },
     feedback: String
   },
+  questionFeedback: [
+    {
+      question: String,
+      answer: String,
+      feedback: String,
+      score: {
+        type: Number,
+        min: 0,
+        max: 100
+      }
+    }
+  ],
   recommendations: String,
   summary: String,
   transcript: String
