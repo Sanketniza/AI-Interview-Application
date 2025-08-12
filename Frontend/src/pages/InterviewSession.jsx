@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import { Button, Card, Alert, Spinner, Badge } from '../components/ui';
+import { interviewService, reportService } from '../services/api';
 
 const InterviewSession = () => {
   const { isAuthenticated } = useSelector((state) => state.auth);
@@ -16,8 +17,8 @@ const InterviewSession = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [interviewComplete, setInterviewComplete] = useState(false);
-  // Session ID for API communication
-  const [, setSessionId] = useState(null);
+  // Interview ID for API communication
+  const [interviewId, setInterviewId] = useState(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userInput, setUserInput] = useState('');
   const [domainInfo, setDomainInfo] = useState({
@@ -30,54 +31,80 @@ const InterviewSession = () => {
       navigate('/login', { state: { from: '/interview/session' } });
     }
     
-    if (!location.state?.domain || !location.state?.role) {
+    if (!location.state?.domain || !location.state?.role || !location.state?.interviewId) {
       navigate('/interview/new');
       return;
     }
     
     setDomainInfo({
       domain: location.state.domain,
-      role: location.state.role
+      role: location.state.role 
     });
+    
+    setInterviewId(location.state.interviewId);
     
     // Start a new interview session
     const startInterview = async () => {
       setLoading(true);
       setError(null);
       try {
-        // In a real implementation, we'd call the backend API
-        // Mock data for demonstration
-        const mockResponse = {
-          sessionId: 'mock-session-' + Date.now(),
-          questions: [
-            {
-              id: 1,
-              question: `Tell me about your experience with ${location.state.role} roles.`
-            },
-            {
-              id: 2,
-              question: `What are the key skills needed for a successful ${location.state.role}?`
-            },
-            {
-              id: 3,
-              question: `Describe a challenging problem you solved in the ${location.state.domain} field.`
-            },
-            {
-              id: 4,
-              question: `How do you stay updated with the latest trends in ${location.state.domain}?`
-            },
-            {
-              id: 5,
-              question: `Where do you see yourself in 5 years in the ${location.state.domain} industry?`
-            }
-          ]
-        };
+        // Get the interview details from the API
+        const response = await interviewService.getInterview(location.state.interviewId);
+        const interviewData = response.data;
         
-        setSessionId(mockResponse.sessionId);
-        setQuestions(mockResponse.questions);
-        setCurrentQuestion(mockResponse.questions[0]);
-      } catch (_) {
-        setError('Failed to start interview session. Please try again.');
+        if (interviewData.questions && interviewData.questions.length > 0) {
+          // Format questions from the API
+          const formattedQuestions = interviewData.questions.map((q, index) => ({
+            id: index + 1,
+            question: q
+          }));
+          
+          setQuestions(formattedQuestions);
+          setCurrentQuestion(formattedQuestions[0]);
+        } else {
+          // If no questions are available, generate some based on domain/role
+          await interviewService.generateQuestions(location.state.interviewId);
+          
+          // Fetch the updated interview with generated questions
+          const updatedResponse = await interviewService.getInterview(location.state.interviewId);
+          const updatedInterviewData = updatedResponse.data;
+          
+          if (updatedInterviewData.questions && updatedInterviewData.questions.length > 0) {
+            // Format questions from the API
+            const formattedQuestions = updatedInterviewData.questions.map((q, index) => ({
+              id: index + 1,
+              question: q
+            }));
+            
+            setQuestions(formattedQuestions);
+            setCurrentQuestion(formattedQuestions[0]);
+          } else {
+            throw new Error('No questions were generated for this interview.');
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load interview:', err);
+        
+        // Create a user-friendly error message
+        let errorMessage = 'Failed to start interview session: ';
+        
+        if (err.response?.data?.message) {
+          // Handle API error with message
+          errorMessage += err.response.data.message;
+        } else if (err.message) {
+          // Handle error with message property
+          errorMessage += err.message;
+        } else {
+          // Generic error
+          errorMessage += 'Please try again later.';
+        }
+        
+        // Additional debugging info in console
+        if (err.response?.data) {
+          console.error('Error response data:', err.response.data);
+        }
+        
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -90,48 +117,101 @@ const InterviewSession = () => {
     setUserInput(e.target.value);
   };
   
-  const handleNext = () => {
+  const handleNext = async () => {
     if (userInput.trim() === '') return;
     
-    // Save current answer
-    setAnswers({
+    // Save current answer locally
+    const newAnswers = {
       ...answers,
       [currentQuestion.id]: userInput
-    });
+    };
+    setAnswers(newAnswers);
     
-    // Clear input for next question
-    setUserInput('');
-    
-    // Move to next question or complete interview
-    if (currentIndex < questions.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-      setCurrentQuestion(questions[currentIndex + 1]);
-    } else {
-      // Last question completed
-      handleComplete();
+    try {
+      // Save question and answer to the database
+      await interviewService.saveQuestionAnswer(interviewId, {
+        question: currentQuestion.question,
+        answer: userInput
+      });
+      
+      // Clear input for next question
+      setUserInput('');
+      
+      // Move to next question or complete interview
+      if (currentIndex < questions.length - 1) {
+        setCurrentIndex(currentIndex + 1);
+        setCurrentQuestion(questions[currentIndex + 1]);
+      } else {
+        // Last question completed
+        handleComplete();
+      }
+    } catch (err) {
+      console.error('Failed to save answer:', err);
+      setError('Failed to save your answer. Please try again.');
     }
   };
   
   const handleComplete = async () => {
     // Include the last answer if not empty
-    let finalAnswers = { ...answers };
     if (userInput.trim() !== '') {
-      finalAnswers[currentQuestion.id] = userInput;
+      try {
+        await interviewService.saveQuestionAnswer(interviewId, {
+          question: currentQuestion.question,
+          answer: userInput
+        });
+      } catch (err) {
+        console.error('Failed to save final answer:', err);
+      }
     }
     
     setIsSubmitting(true);
     setError(null);
     
     try {
-      // In a real implementation, we'd submit to the backend API
-      // Mock submission for demonstration
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Complete the interview in the database
+      await interviewService.completeInterview(interviewId);
+      
+      // Generate a report based on the interview
+      const reportResponse = await reportService.generateReport(interviewId);
       
       setInterviewComplete(true);
-      // Navigate to report page with mock report ID
-      navigate('/interview/report/mock-report-' + Date.now());
-    } catch (_) {
-      setError('Failed to submit interview. Please try again.');
+      
+      // Navigate to the report page with the real report ID
+      navigate(`/interview/report/${reportResponse.data._id}`);
+    } catch (err) {
+      console.error('Failed to complete interview:', err);
+      const errorMessage = err.message || 'Failed to submit interview. Please try again.';
+      setError(errorMessage);
+      setIsSubmitting(false);
+    }
+  };
+  
+  // Helper function to retry the submission process
+  const retrySubmission = async () => {
+    setIsSubmitting(true);
+    setError(null);
+    
+    try {
+      // First check if the interview is already completed
+      const interviewResponse = await interviewService.getInterview(interviewId);
+      const interviewData = interviewResponse.data;
+      
+      // Only try to complete the interview if it's not already completed
+      if (interviewData.status !== 'completed') {
+        await interviewService.completeInterview(interviewId);
+      }
+      
+      // Try to generate the report
+      const reportResponse = await reportService.generateReport(interviewId);
+      
+      setInterviewComplete(true);
+      
+      // Navigate to the report page with the real report ID
+      navigate(`/interview/report/${reportResponse.data._id}`);
+    } catch (err) {
+      console.error('Retry submission failed:', err);
+      const errorMessage = err.message || 'Failed to submit interview. Please try again.';
+      setError(errorMessage);
       setIsSubmitting(false);
     }
   };
@@ -149,18 +229,117 @@ const InterviewSession = () => {
     );
   }
   
-  if (interviewComplete || isSubmitting) {
+  // Display a dedicated error page if we have errors but no questions loaded
+  if (error && (!questions || questions.length === 0)) {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-12">
           <Card>
             <div className="text-center py-8">
-              <Spinner size="lg" className="mx-auto mb-4" />
-              <h2 className="text-2xl font-bold mb-2">Analyzing Your Responses</h2>
-              <p className="text-gray-600">
-                We're generating your feedback report. This may take a moment...
-              </p>
+              <svg className="mx-auto h-16 w-16 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <h2 className="text-2xl font-bold mt-4 mb-2">Failed to Start Interview</h2>
+              <p className="text-gray-600 mb-6">{error}</p>
+              <div className="flex justify-center space-x-4">
+                <Button 
+                  color="primary" 
+                  onClick={() => {
+                    setError(null);
+                    setLoading(true);
+                    
+                    // Retry the interview setup process
+                    const startInterview = async () => {
+                      try {
+                        // First try to generate new questions
+                        await interviewService.generateQuestions(interviewId);
+                        
+                        // Then fetch the updated interview data
+                        const updatedResponse = await interviewService.getInterview(interviewId);
+                        const updatedInterviewData = updatedResponse.data;
+                        
+                        if (updatedInterviewData.questions && updatedInterviewData.questions.length > 0) {
+                          const formattedQuestions = updatedInterviewData.questions.map((q, index) => ({
+                            id: index + 1,
+                            question: q
+                          }));
+                          
+                          setQuestions(formattedQuestions);
+                          setCurrentQuestion(formattedQuestions[0]);
+                        } else {
+                          throw new Error('Failed to generate interview questions');
+                        }
+                      } catch (retryErr) {
+                        console.error('Retry failed:', retryErr);
+                        setError(`Retry failed: ${retryErr.message || 'Unknown error'}`);
+                      } finally {
+                        setLoading(false);
+                      }
+                    };
+                    
+                    startInterview();
+                  }}
+                >
+                  Retry Interview
+                </Button>
+                <Button 
+                  variant="outlined" 
+                  color="secondary" 
+                  onClick={() => navigate('/interview/new')}
+                >
+                  Start New Interview
+                </Button>
+              </div>
             </div>
+          </Card>
+        </div>
+      </Layout>
+    );
+  }
+  
+  if (interviewComplete || isSubmitting) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-12">
+          <Card>
+            {error ? (
+              <div className="text-center py-8">
+                <svg className="mx-auto h-16 w-16 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <h2 className="text-2xl font-bold mt-4 mb-2">Submission Error</h2>
+                <p className="text-gray-600 mb-6">{error}</p>
+                <div className="flex flex-col items-center">
+                  <Button 
+                    color="primary" 
+                    onClick={retrySubmission}
+                    className="mb-4 w-48"
+                  >
+                    Retry Submission
+                  </Button>
+                  <Button 
+                    variant="outlined" 
+                    color="secondary" 
+                    onClick={() => navigate('/interview/history')}
+                    className="w-48"
+                  >
+                    View Interview History
+                  </Button>
+                </div>
+                <p className="text-xs text-gray-500 mt-4">
+                  If the problem persists, your answers have been saved. You can access this interview 
+                  from your interview history later.
+                </p>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Spinner size="lg" className="mx-auto mb-4" />
+                <h2 className="text-2xl font-bold mb-2">Analyzing Your Responses</h2>
+                <p className="text-gray-600">
+                  We're generating your feedback report. This may take a moment...
+                </p>
+              </div>
+            )}
           </Card>
         </div>
       </Layout>
@@ -187,7 +366,55 @@ const InterviewSession = () => {
         
         {error && (
           <Alert type="error" className="mb-6" dismissible onDismiss={() => setError(null)}>
-            {error}
+            <div className="flex flex-col">
+              <div className="mb-2">{error}</div>
+              <div>
+                <Button 
+                  variant="outlined" 
+                  color="danger" 
+                  size="sm" 
+                  onClick={() => {
+                    setError(null);
+                    setLoading(true);
+                    // Retry the interview setup process
+                    const startInterview = async () => {
+                      try {
+                        // First try to generate new questions
+                        await interviewService.generateQuestions(interviewId);
+                        
+                        // Then fetch the updated interview data
+                        const updatedResponse = await interviewService.getInterview(interviewId);
+                        const updatedInterviewData = updatedResponse.data;
+                        
+                        if (updatedInterviewData.questions && updatedInterviewData.questions.length > 0) {
+                          const formattedQuestions = updatedInterviewData.questions.map((q, index) => ({
+                            id: index + 1,
+                            question: q
+                          }));
+                          
+                          setQuestions(formattedQuestions);
+                          setCurrentQuestion(formattedQuestions[0]);
+                          setCurrentIndex(0);
+                          setUserInput('');
+                          setAnswers({});
+                        } else {
+                          throw new Error('Failed to generate interview questions');
+                        }
+                      } catch (retryErr) {
+                        console.error('Retry failed:', retryErr);
+                        setError(`Retry failed: ${retryErr.message || 'Unknown error'}`);
+                      } finally {
+                        setLoading(false);
+                      }
+                    };
+                    
+                    startInterview();
+                  }}
+                >
+                  Retry
+                </Button>
+              </div>
+            </div>
           </Alert>
         )}
         

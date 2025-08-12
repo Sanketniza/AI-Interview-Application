@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
-import { Button, Card, Select } from '../components/ui';
+import { Button, Card, Select, Alert } from '../components/ui';
+import { interviewService } from '../services/api';
 
 const domains = [
   { 
@@ -84,14 +85,38 @@ const InterviewSelection = () => {
     setSelectedRole(e.target.value);
   };
   
-  const handleStartInterview = () => {
+  const [isStarting, setIsStarting] = useState(false);
+  const [error, setError] = useState(null);
+  
+  const handleStartInterview = async () => {
     if (selectedDomain && selectedRole) {
-      navigate(`/interview/session`, { 
-        state: { 
-          domain: domains.find(d => d.id === selectedDomain).name,
-          role: availableRoles.find(r => r.id === selectedRole).name
-        } 
-      });
+      setIsStarting(true);
+      setError(null);
+      
+      try {
+        const domainName = domains.find(d => d.id === selectedDomain).name;
+        const roleName = availableRoles.find(r => r.id === selectedRole).name;
+        
+        // Call the API to create a new interview in the database
+        const response = await interviewService.startInterview({
+          jobRole: roleName,
+          companyName: 'Practice Interview', // Default company name for practice
+          interviewType: domainName
+        });
+        
+        // Navigate to the interview session with the interview ID
+        navigate(`/interview/session`, { 
+          state: { 
+            interviewId: response.data._id,
+            domain: domainName,
+            role: roleName
+          } 
+        });
+      } catch (err) {
+        console.error('Failed to start interview:', err);
+        setError('Failed to start interview. Please try again.');
+        setIsStarting(false);
+      }
     }
   };
   
@@ -160,15 +185,21 @@ const InterviewSelection = () => {
             </div>
           </Card>
           
+          {error && (
+            <Alert type="error" className="mb-6" dismissible onDismiss={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
+          
           <div className="flex justify-between">
             <Button variant="outline" onClick={() => navigate('/dashboard')}>
               Cancel
             </Button>
             <Button 
               onClick={handleStartInterview}
-              disabled={!selectedDomain || !selectedRole}
+              disabled={!selectedDomain || !selectedRole || isStarting}
             >
-              Start Interview
+              {isStarting ? 'Starting...' : 'Start Interview'}
             </Button>
           </div>
         </div>

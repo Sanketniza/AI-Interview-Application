@@ -67,4 +67,145 @@ export const authService = {
   }
 };
 
+// Interview services
+export const interviewService = {
+  // Start a new interview
+  startInterview: async (interviewData) => {
+    try {
+      const response = await api.post('/interview', interviewData);
+      return response.data;
+    } catch (error) {
+      console.error('API start interview error:', error);
+      throw error;
+    }
+  },
+  
+  // Generate questions for an interview
+  generateQuestions: async (interviewId) => {
+    try {
+      const response = await api.post(`/interview/${interviewId}/questions`);
+      return response.data;
+    } catch (error) {
+      console.error('API generate questions error:', error.response?.data?.message || error.message);
+      console.error('Full error details:', error);
+      
+      // Create a more descriptive error object
+      const enhancedError = new Error(
+        error.response?.data?.message || 
+        error.response?.data?.error ||
+        'Failed to generate interview questions'
+      );
+      enhancedError.originalError = error;
+      enhancedError.statusCode = error.response?.status;
+      enhancedError.details = error.response?.data;
+      
+      throw enhancedError;
+    }
+  },
+  
+  // Save a question and answer
+  saveQuestionAnswer: async (interviewId, questionData) => {
+    try {
+      const response = await api.put(`/interview/${interviewId}/question`, questionData);
+      return response.data;
+    } catch (error) {
+      console.error('API save question error:', error);
+      throw error;
+    }
+  },
+  
+  // Complete an interview
+  completeInterview: async (interviewId) => {
+    try {
+      const response = await api.put(`/interview/${interviewId}/complete`);
+      return response.data;
+    } catch (error) {
+      console.error('API complete interview error:', error.response?.data?.message || error.message);
+      console.error('Full error details:', error);
+      
+      // Create a more descriptive error object
+      const enhancedError = new Error(
+        error.response?.data?.message || 
+        error.response?.data?.error ||
+        'Failed to complete the interview'
+      );
+      enhancedError.originalError = error;
+      enhancedError.statusCode = error.response?.status;
+      enhancedError.details = error.response?.data;
+      
+      throw enhancedError;
+    }
+  },
+  
+  // Get all interviews
+  getInterviews: async () => {
+    try {
+      const response = await api.get('/interview');
+      return response.data;
+    } catch (error) {
+      console.error('API get interviews error:', error);
+      throw error;
+    }
+  },
+  
+  // Get a specific interview
+  getInterview: async (interviewId) => {
+    try {
+      const response = await api.get(`/interview/${interviewId}`);
+      return response.data;
+    } catch (error) {
+      console.error('API get interview error:', error);
+      throw error;
+    }
+  }
+};
+
+// Report services
+export const reportService = {
+  // Generate a report for an interview
+  generateReport: async (interviewId) => {
+    try {
+      const response = await api.post(`/report/${interviewId}`);
+      return response.data;
+    } catch (error) {
+      console.error('API generate report error:', error.response?.data?.message || error.message);
+      console.error('Full error details:', error);
+      
+      // Create a more descriptive error object
+      const enhancedError = new Error(
+        error.response?.data?.message || 
+        error.response?.data?.error ||
+        'Failed to generate the interview report'
+      );
+      enhancedError.originalError = error;
+      enhancedError.statusCode = error.response?.status;
+      enhancedError.details = error.response?.data;
+      
+      throw enhancedError;
+    }
+  },
+  
+  // Get all reports
+  getReports: async () => {
+    try {
+      const response = await api.get('/report');
+      return response.data;
+    } catch (error) {
+      console.error('API get reports error:', error);
+      throw error;
+    }
+  },
+  
+  // Get a specific report
+  getReport: async (reportId) => {
+    try {
+      const response = await api.get(`/report/${reportId}`);
+      return response.data;
+    } catch (error) {
+      console.error('API get report error:', error);
+      throw error;
+    }
+  }
+};
+
 export default api;

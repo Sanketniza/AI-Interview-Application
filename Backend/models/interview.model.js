@@ -46,6 +46,11 @@ const interviewSchema = new mongoose.Schema({
     enum: ['in-progress', 'completed', 'cancelled'],
     default: 'in-progress'
   },
+  reportStatus: {
+    type: String,
+    enum: ['pending', 'generated', 'failed'],
+    default: 'pending'
+  },
   startTime: {
     type: Date,
     default: Date.now
