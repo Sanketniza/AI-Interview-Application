@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import { Button, Card, Alert, Spinner, Badge } from '../components/ui';
+import { reportService, interviewService } from '../services/api';
 
 const InterviewReport = () => {
   const { isAuthenticated } = useSelector((state) => state.auth);
@@ -16,6 +17,7 @@ const InterviewReport = () => {
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/login', { state: { from: `/interview/report/${reportId}` } });
+      return;
     }
     
     const fetchReport = async () => {
@@ -23,62 +25,34 @@ const InterviewReport = () => {
       setError(null);
       
       try {
-        // In a real implementation, we'd fetch from the backend API
-        // Mock data for demonstration
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Fetch report data from API
+        const reportResponse = await reportService.getReport(reportId);
+        const report = reportResponse.data;
         
-        const mockReport = {
-          id: reportId,
-          date: new Date().toISOString(),
-          domain: 'Software Engineering',
-          role: 'Fullstack Developer',
-          overallScore: 85,
-          strengths: [
-            'Strong technical knowledge',
-            'Clear communication',
-            'Problem-solving approach'
-          ],
-          improvements: [
-            'Could provide more specific examples',
-            'Consider structuring answers with STAR method',
-            'Be more concise in responses'
-          ],
-          questionResponses: [
-            {
-              question: 'Tell me about your experience with Fullstack Developer roles.',
-              answer: 'I have been working as a fullstack developer for 3 years...',
-              feedback: 'Good overview of experience, but could be more specific about technologies used and challenges overcome.',
-              score: 80
-            },
-            {
-              question: 'What are the key skills needed for a successful Fullstack Developer?',
-              answer: 'A fullstack developer needs to be proficient in both frontend and backend technologies...',
-              feedback: 'Excellent comprehensive answer covering technical and soft skills. Well structured.',
-              score: 95
-            },
-            {
-              question: 'Describe a challenging problem you solved in the Software Engineering field.',
-              answer: 'I once had to optimize a database query that was causing performance issues...',
-              feedback: 'Good example, but could provide more details about the specific steps taken and metrics of improvement.',
-              score: 85
-            },
-            {
-              question: 'How do you stay updated with the latest trends in Software Engineering?',
-              answer: 'I follow several tech blogs, participate in online communities, and attend webinars...',
-              feedback: 'Strong answer showing commitment to continued learning. Consider mentioning specific resources.',
-              score: 90
-            },
-            {
-              question: 'Where do you see yourself in 5 years in the Software Engineering industry?',
-              answer: 'I aim to become a technical lead guiding a team of developers...',
-              feedback: 'Good career vision, but could connect more explicitly to how current role contributes to that goal.',
-              score: 75
-            }
-          ]
+        // Fetch the related interview data
+        const interviewResponse = await interviewService.getInterview(report.interview);
+        const interview = interviewResponse.data;
+        
+        // Combine the data into our report object
+        const formattedReport = {
+          id: report._id,
+          date: interview.createdAt,
+          domain: interview.interviewType,
+          role: interview.jobRole,
+          overallScore: report.overallScore,
+          strengths: report.strengths || [],
+          improvements: report.areasForImprovement || [],
+          questionResponses: (report.questionFeedback || []).map(feedback => ({
+            question: feedback.question,
+            answer: feedback.answer,
+            feedback: feedback.feedback,
+            score: feedback.score
+          }))
         };
         
-        setReport(mockReport);
-      } catch (_) {
+        setReport(formattedReport);
+      } catch (err) {
+        console.error('Failed to fetch interview report:', err);
         setError('Failed to fetch interview report. Please try again.');
       } finally {
         setLoading(false);

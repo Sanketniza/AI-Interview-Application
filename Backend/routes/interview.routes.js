@@ -10,6 +10,9 @@ router.use(authMiddleware);
 // Create a new interview
 router.post('/', validateStartInterview, interviewController.startInterview);
 
+// Generate questions for an interview
+router.post('/:id/questions', interviewController.generateQuestions);
+
 // Save question and answer to an interview
 router.put('/:id/question', validateQuestionAnswer, interviewController.saveQuestionAnswer);
 
