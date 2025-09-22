@@ -21,7 +21,7 @@ const App = () => {
 
     return (
         <div>
-            {/* ...existing code... */}
+           
             {interviewEnded && (
                 reportError ? (
                     <div className="error-message">{reportError}</div>
@@ -31,7 +31,7 @@ const App = () => {
                     <div>Report pending</div>
                 )
             )}
-            {/* ...existing code... */}
+           
         </div>
     );
 };
