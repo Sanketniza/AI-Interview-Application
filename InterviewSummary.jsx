@@ -1,11 +1,7 @@
 import React from 'react';
 import { InterviewAnalysis } from './InterviewReportGenerator';
 
-interface Props {
-    analysis: InterviewAnalysis;
-}
-
-const InterviewSummary: React.FC<Props> = ({ analysis }) => (
+const InterviewSummary = ({ analysis }) => (
     <div>
         <h2>Interview Report</h2>
         <h3>Strengths</h3>
