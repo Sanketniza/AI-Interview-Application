@@ -39,12 +39,14 @@ const PORT = process.env.PORT || 5000;
 
 // Connect to MongoDB and start server only if connection is successful
 connectDB()
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
-    });
-  })
+
+    .then(() => {
+        app.listen(PORT, () => {
+            console.log(`Server is running on port ${PORT}`);
+        });
+    })
+
   .catch(err => {
-    console.error('Failed to start server due to database connection error:', err.message);
-    process.exit(1);
-  });
+        console.error('Failed to start server due to database connection error:', err.message);
+        process.exit(1);
+    });
