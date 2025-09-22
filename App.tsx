@@ -24,7 +24,7 @@ const App = () => {
             {/* ...existing code... */}
             {interviewEnded && (
                 reportError ? (
-                    <div style={{ color: 'red' }}>{reportError}</div>
+                    <div className="error-message">{reportError}</div>
                 ) : interviewResult ? (
                     <InterviewSummary analysis={generateInterviewReport(interviewResult)} />
                 ) : (
